@@ -1,0 +1,81 @@
+@model CustomerInfo
+@{
+    ViewData["Title"] = "Customer Information";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-person-plus"></i> Customer Information</h4>
+                </div>
+                <div class="card-body">
+
+                    <form asp-action="Create" method="post">
+                        @Html.AntiForgeryToken()
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label asp-for="AccountNo" class="form-label fw-medium">Account No</label>
+                                <input asp-for="AccountNo" class="form-control" placeholder="e.g. 20501840203923403" />
+                                <span asp-validation-for="AccountNo" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label asp-for="AccountName" class="form-label fw-medium">Account Name</label>
+                                <input asp-for="AccountName" class="form-control" placeholder="Full account holder name" />
+                                <span asp-validation-for="AccountName" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label asp-for="AccountType" class="form-label fw-medium">Account Type</label>
+                                <select asp-for="AccountType" class="form-select">
+                                    @foreach (var t in CustomerAccountTypes.Types)
+                                    {
+                                        <option value="@t">@t</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label asp-for="Currency" class="form-label fw-medium">Currency</label>
+                                <select asp-for="Currency" class="form-select">
+                                    @foreach (var c in CustomerCurrencies.Codes)
+                                    {
+                                        <option value="@c">@c</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label asp-for="CIF" class="form-label fw-medium">CIF</label>
+                                <input asp-for="CIF" class="form-control" placeholder="Customer ID" />
+                            </div>
+
+                            <div class="col-md-12">
+                                <label asp-for="Branch" class="form-label fw-medium">Branch</label>
+                                <input asp-for="Branch" class="form-control" placeholder="e.g. Natore Branch, Mogbazar Branch" />
+                            </div>
+                        </div>
+
+                        <hr class="my-4" />
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg px-5">
+                                <i class="bi bi-gear"></i> Generate
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,97 @@
+@model CustomerInfo
+@{
+    ViewData["Title"] = "Select Service";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+
+            @* Customer summary card *@
+            <div class="card bg-light mb-4">
+                <div class="card-body py-3">
+                    <div class="row row-cols-2 row-cols-md-4 g-2 small">
+                        <div><strong>A/C:</strong> @Model.AccountNo</div>
+                        <div><strong>Name:</strong> @Model.AccountName</div>
+                        <div><strong>Type:</strong> @Model.AccountType</div>
+                        <div><strong>Currency:</strong> @Model.Currency</div>
+                        <div><strong>Branch:</strong> @Model.Branch</div>
+                        <div><strong>CIF:</strong> @Model.CIF</div>
+                    </div>
+                </div>
+            </div>
+
+            <h5 class="mb-3 fw-semibold">Select Service</h5>
+
+            <form asp-action="SelectService" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="AccountNo" />
+                <input type="hidden" asp-for="AccountName" />
+                <input type="hidden" asp-for="AccountType" />
+                <input type="hidden" asp-for="Currency" />
+                <input type="hidden" asp-for="Branch" />
+                <input type="hidden" asp-for="CIF" />
+
+                <div class="row g-4">
+
+                    @* Bank Statement card *@
+                    <div class="col-md-6">
+                        <button type="submit" name="service" value="BankStatement"
+                                class="card h-100 text-start border-0 shadow-sm service-card">
+                            <div class="card-body text-center py-5">
+                                <div class="display-3 mb-3 text-primary">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </div>
+                                <h5 class="card-title fw-bold">Bank Statement</h5>
+                                <p class="card-text text-muted small">
+                                    Upload a bank statement PDF, extract transactions,
+                                    and preview as an editable HTML table.
+                                </p>
+                                <span class="badge bg-primary">Active</span>
+                            </div>
+                        </button>
+                    </div>
+
+                    @* Solvency Certificate card *@
+                    <div class="col-md-6">
+                        <button type="submit" name="service" value="SolvencyCertificate"
+                                class="card h-100 text-start border-0 shadow-sm service-card">
+                            <div class="card-body text-center py-5">
+                                <div class="display-3 mb-3 text-secondary">
+                                    <i class="bi bi-file-earmark-text"></i>
+                                </div>
+                                <h5 class="card-title fw-bold">Solvency Certificate</h5>
+                                <p class="card-text text-muted small">
+                                    Generate a solvency / net-worth certificate
+                                    from the statement data.
+                                </p>
+                                <span class="badge bg-warning text-dark">Coming Soon</span>
+                            </div>
+                        </button>
+                    </div>
+
+                </div>
+            </form>
+
+            <div class="mt-3">
+                <a asp-action="Create" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Edit Customer Info
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .service-card {
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .service-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12) !important;
+    }
+    .service-card:active {
+        transform: translateY(-1px);
+    }
+</style>

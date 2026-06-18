@@ -23,10 +23,28 @@ public class StatementController : Controller
 
     /// <summary>
     /// Upload form.
+    /// Accepts optional customer context from the service selection flow.
     /// </summary>
     [HttpGet]
-    public IActionResult Upload()
+    public IActionResult Upload(
+        string? accountNo = null,
+        string? accountName = null,
+        string? accountType = null,
+        string? currency = null,
+        string? branch = null,
+        string? cif = null)
     {
+        // Pass customer context if coming from service selection
+        if (!string.IsNullOrEmpty(accountNo))
+        {
+            ViewBag.CustomerAccountNo = accountNo;
+            ViewBag.CustomerName = accountName;
+            ViewBag.CustomerAccountType = accountType;
+            ViewBag.CustomerCurrency = currency;
+            ViewBag.CustomerBranch = branch;
+            ViewBag.CustomerCIF = cif;
+        }
+
         var vm = new StatementUploadViewModel
         {
             AvailableBanks = _parserRegistry.AllParsers
