@@ -1,0 +1,81 @@
+@model StatementUploadViewModel
+@{
+    ViewData["Title"] = "Upload Bank Statement";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-file-earmark-pdf"></i> Upload Bank Statement</h4>
+                </div>
+                <div class="card-body">
+                    @if (TempData["Error"] is not null)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            @TempData["Error"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    }
+
+                    <form asp-action="Upload" method="post" enctype="multipart/form-data">
+                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                        <div class="mb-4">
+                            <label asp-for="File" class="form-label fw-semibold">Select PDF File</label>
+                            <input asp-for="File" type="file" accept=".pdf"
+                                   class="form-control form-control-lg" />
+                            <span asp-validation-for="File" class="text-danger"></span>
+                            <div class="form-text">
+                                Supported format: PDF (up to 50 MB).
+                                Scanned/image PDFs will require OCR setup.
+                            </div>
+                        </div>
+
+                        @if (Model.AvailableBanks is { Count: > 0 })
+                        {
+                            <div class="mb-4">
+                                <label asp-for="SelectedBankKey" class="form-label fw-semibold">
+                                    Or select your bank manually:
+                                </label>
+                                <select asp-for="SelectedBankKey" class="form-select">
+                                    <option value="">-- Auto-detect --</option>
+                                    @foreach (var bank in Model.AvailableBanks)
+                                    {
+                                        <option value="@bank.BankKey">@bank.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-upload"></i> Upload & Preview
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-3 bg-light">
+                <div class="card-body">
+                    <h6 class="card-title">Supported Banks</h6>
+                    <ul class="list-unstyled mb-0">
+                        @if (Model.AvailableBanks is not null)
+                        {
+                            @foreach (var bank in Model.AvailableBanks)
+                            {
+                                <li><i class="bi bi-building"></i> @bank.DisplayName</li>
+                            }
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

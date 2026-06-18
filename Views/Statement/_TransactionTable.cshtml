@@ -1,0 +1,249 @@
+@model StatementEditViewModel
+
+@{
+    var totalDebit = Model.TotalDebit;
+    var totalCredit = Model.TotalCredit;
+}
+
+<form method="post" asp-action="SubmitEdits">
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(m => m.BankName)
+    @Html.HiddenFor(m => m.AccountNumber)
+    @Html.HiddenFor(m => m.AccountHolderName)
+    @Html.HiddenFor(m => m.AccountType)
+    @Html.HiddenFor(m => m.Currency)
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center bg-success text-white">
+            <div>
+                <h5 class="mb-0">
+                    <i class="bi bi-bank"></i> @Model.BankName
+                </h5>
+                @if (!string.IsNullOrEmpty(Model.AccountType))
+                {
+                    <small class="opacity-75">@Model.AccountType Account</small>
+                }
+            </div>
+            <div class="text-end">
+                <div><strong>A/C:</strong> @Model.AccountNumber</div>
+                @if (!string.IsNullOrEmpty(Model.AccountHolderName))
+                {
+                    <div><strong>Name:</strong> @Model.AccountHolderName</div>
+                }
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0" id="editableTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="ps-3" style="width:120px">Date</th>
+                            <th>Description</th>
+                            <th style="width:160px">Ref / Cheque</th>
+                            <th class="text-end" style="width:140px">Withdraw (Dr)</th>
+                            <th class="text-end" style="width:140px">Deposit (Cr)</th>
+                            <th class="text-end pe-3" style="width:140px">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < Model.Transactions.Count; i++)
+                        {
+                            var txn = Model.Transactions[i];
+                            <tr>
+                                <td class="ps-3" style="width:120px">
+                                    @Html.HiddenFor(m => m.Transactions[i].RowIndex)
+                                    <input type="text" class="td-input" 
+                                           asp-for="Transactions[i].Date" 
+                                           value="@txn.Date" />
+                                </td>
+                                <td>
+                                    <input type="text" class="td-input" 
+                                           asp-for="Transactions[i].Description" 
+                                           value="@txn.Description" />
+                                </td>
+                                <td style="width:160px">
+                                    <input type="text" class="td-input text-start" 
+                                           asp-for="Transactions[i].Reference" 
+                                           value="@txn.Reference" />
+                                </td>
+                                <td class="text-end" style="width:140px">
+                                    <input type="text" class="td-input text-end fw-medium text-danger" 
+                                           asp-for="Transactions[i].Debit" 
+                                           value="@txn.Debit?.ToString("N2")" />
+                                </td>
+                                <td class="text-end" style="width:140px">
+                                    <input type="text" class="td-input text-end fw-medium text-success" 
+                                           asp-for="Transactions[i].Credit" 
+                                           value="@txn.Credit?.ToString("N2")" />
+                                </td>
+                                <td class="text-end pe-3" style="width:140px">
+                                    <input type="text" class="td-input text-end fw-medium" 
+                                           asp-for="Transactions[i].Balance" 
+                                           value="@txn.Balance?.ToString("N2")" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-dark">
+                        <tr>
+                            <td class="ps-3" colspan="2">
+                                <strong>Total</strong>
+                                <span class="badge bg-info ms-2">@Model.Transactions.Count transactions</span>
+                            </td>
+                            <td></td>
+                            <td class="text-end">@totalDebit.ToString("N2")</td>
+                            <td class="text-end">@totalCredit.ToString("N2")</td>
+                            <td class="text-end pe-3">
+                                <strong>@Model.Transactions.LastOrDefault()?.Balance?.ToString("N2")</strong>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <small class="text-muted">
+                <i class="bi bi-pencil-square"></i> Click any cell to edit. Press <kbd>Tab</kbd> to move, <kbd>Enter</kbd> or click away to save.
+            </small>
+            <div>
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-lg"></i> Submit Transactions
+                </button>
+                <a asp-action="Upload" class="btn btn-outline-secondary ms-2">
+                    <i class="bi bi-x-lg"></i> Cancel
+                </a>
+            </div>
+        </div>
+    </div>
+</form>
+
+@if (Model.Transactions.Count > 0)
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h6 class="card-title text-muted">Opening Balance</h6>
+                    <h4 class="text-primary mb-0">
+                        @((Model.Transactions.First().Balance ?? 0) - (Model.Transactions.First().Credit ?? 0) + (Model.Transactions.First().Debit ?? 0))
+                    </h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h6 class="card-title text-muted">Total Deposit</h6>
+                    <h4 class="text-success mb-0">@totalCredit.ToString("N2")</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <h6 class="card-title text-muted">Total Withdraw</h6>
+                    <h4 class="text-danger mb-0">@totalDebit.ToString("N2")</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-dark">
+                <div class="card-body text-center">
+                    <h6 class="card-title text-muted">Closing Balance</h6>
+                    <h4 class="mb-0">@Model.Transactions.LastOrDefault()?.Balance?.ToString("N2")</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    /* ── Editable-table inputs: invisible until clicked ── */
+    #editableTable input[type="text"].td-input {
+        border: none;
+        background: transparent;
+        padding: 6px 4px;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        font: inherit;
+        color: inherit;
+        cursor: default;
+        outline: none;
+        transition: background 0.15s, border-color 0.15s;
+        line-height: 1.4;
+    }
+
+    /* Hover: subtle hint that cell is editable */
+    #editableTable td:hover input[type="text"].td-input {
+        background: rgba(255, 255, 255, 0.4);
+        border-radius: 3px;
+    }
+
+    /* Focus: clearly shows an editable field */
+    #editableTable input[type="text"].td-input:focus {
+        background: #fff;
+        border: 1px solid #86b7fe;
+        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+        border-radius: 3px;
+        cursor: text;
+        position: relative;
+        box-sizing: border-box;
+    }
+
+    /* Ensure cells don't clip the focus ring */
+    #editableTable td {
+        padding: 2px 4px !important;
+        vertical-align: middle;
+    }
+
+    #editableTable td:first-child {
+        padding-left: 12px !important;
+    }
+    #editableTable td:last-child {
+        padding-right: 12px !important;
+    }
+</style>
+
+@section Scripts {
+    <script>
+        (function() {
+            const table = document.getElementById('editableTable');
+            if (!table) return;
+
+            // Click on a cell focuses its input
+            table.querySelectorAll('td').forEach(cell => {
+                cell.addEventListener('click', function(e) {
+                    if (e.target.tagName === 'INPUT') return;
+                    const input = this.querySelector('input[type="text"]');
+                    if (input) {
+                        input.focus();
+                        input.select();
+                    }
+                });
+            });
+
+            // Enter key: blur the input (saves edit) and move to next cell
+            table.querySelectorAll('input[type="text"]').forEach(input => {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.blur();
+
+                        // Move focus to the next input (or same row, next col)
+                        const inputs = Array.from(
+                            table.querySelectorAll('input[type="text"]:not([type="hidden"])')
+                        );
+                        const idx = inputs.indexOf(this);
+                        if (idx >= 0 && idx < inputs.length - 1) {
+                            inputs[idx + 1].focus();
+                            inputs[idx + 1].select();
+                        }
+                    }
+                });
+            });
+        })();
+    </script>
+}
