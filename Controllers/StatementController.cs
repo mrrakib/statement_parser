@@ -1,31 +1,28 @@
 using Microsoft.AspNetCore.Mvc;
+using StatementParser.Models;
 using StatementParser.Services;
-using StatementParser.Services.Parsers;
+using StatementParser.Services.Pdf;
 using StatementParser.ViewModels;
+using System.Text.Json;
 
 namespace StatementParser.Controllers;
 
 public class StatementController : Controller
 {
-    private readonly StatementProcessingService _processingService;
-    private readonly ParserRegistry _parserRegistry;
     private readonly ILogger<StatementController> _logger;
+    private readonly StatementProcessingService _processingService;
 
     public StatementController(
-        StatementProcessingService processingService,
-        ParserRegistry parserRegistry,
-        ILogger<StatementController> logger)
+        ILogger<StatementController> logger,
+        StatementProcessingService processingService)
     {
-        _processingService = processingService;
-        _parserRegistry = parserRegistry;
         _logger = logger;
+        _processingService = processingService;
     }
 
     /// <summary>
-    /// Upload form.
-    /// Accepts optional customer context from the service selection flow.
+    /// Upload page — accepts customer context from Customer flow via query params.
     /// </summary>
-    [HttpGet]
     public IActionResult Upload(
         string? accountNo = null,
         string? accountName = null,
@@ -34,8 +31,8 @@ public class StatementController : Controller
         string? branch = null,
         string? cif = null)
     {
-        // Pass customer context if coming from service selection
-        if (!string.IsNullOrEmpty(accountNo))
+        // If called from Customer flow, persist info in ViewBag + TempData
+        if (accountNo is not null)
         {
             ViewBag.CustomerAccountNo = accountNo;
             ViewBag.CustomerName = accountName;
@@ -43,80 +40,72 @@ public class StatementController : Controller
             ViewBag.CustomerCurrency = currency;
             ViewBag.CustomerBranch = branch;
             ViewBag.CustomerCIF = cif;
+
+            // Save for POST flow (survives form submission)
+            TempData["CustomerAccountNo"] = accountNo;
+            TempData["CustomerName"] = accountName;
+            TempData["CustomerAccountType"] = accountType;
+            TempData["CustomerCurrency"] = currency;
+            TempData["CustomerBranch"] = branch;
+            TempData["CustomerCIF"] = cif;
         }
 
-        var vm = new StatementUploadViewModel
-        {
-            AvailableBanks = _parserRegistry.AllParsers
-                .Select(p => new BankOptionViewModel
-                {
-                    BankKey = p.BankKey,
-                    DisplayName = p.DisplayName
-                }).ToList()
-        };
-        return View(vm);
+        return View(new StatementUploadViewModel());
     }
 
     /// <summary>
-    /// Handle PDF upload, auto-detect bank, parse, and preview.
+    /// Process uploaded PDF and show editable preview.
     /// </summary>
     [HttpPost]
-    [RequestSizeLimit(50 * 1024 * 1024)] // 50 MB max
-    public async Task<IActionResult> Upload(StatementUploadViewModel model, CancellationToken ct)
+    public IActionResult Upload(StatementUploadViewModel model)
     {
         if (model.File is null || model.File.Length == 0)
         {
             ModelState.AddModelError("File", "Please select a file to upload.");
-            model.AvailableBanks = _parserRegistry.AllParsers
-                .Select(p => new BankOptionViewModel
-                {
-                    BankKey = p.BankKey,
-                    DisplayName = p.DisplayName
-                }).ToList();
+            model.AvailableBanks = GetAvailableBankOptions();
             return View(model);
         }
 
-        // Validate PDF extension
-        var extension = Path.GetExtension(model.File.FileName).ToLowerInvariant();
-        if (extension != ".pdf")
+        if (!model.File.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
         {
             ModelState.AddModelError("File", "Only PDF files are supported.");
-            model.AvailableBanks = _parserRegistry.AllParsers
-                .Select(p => new BankOptionViewModel
-                {
-                    BankKey = p.BankKey,
-                    DisplayName = p.DisplayName
-                }).ToList();
+            model.AvailableBanks = GetAvailableBankOptions();
             return View(model);
         }
 
         try
         {
-            await using var stream = model.File.OpenReadStream();
-
-            // If user selected a specific bank, force it
-            string? forceBank = model.IsRetry ? model.SelectedBankKey : null;
-
-            var result = await _processingService.ProcessAsync(stream, forceBank, ct);
+            var result = _processingService.ProcessAsync(model.File.OpenReadStream()).Result;
 
             if (!result.Success)
             {
-                TempData["Error"] = result.ErrorMessage ?? "Failed to process the statement.";
-                return RedirectToAction(nameof(Upload));
+                TempData["Error"] = $"Could not parse this PDF. Detection result: {result.DetectedBank ?? "Unknown"} with {result.Confidence:P1} confidence.";
+                model.AvailableBanks = GetAvailableBankOptions();
+                return View(model);
             }
 
             TempData["Success"] = $"Parsed {result.Statement?.TransactionCount ?? 0} transactions from {result.DetectedBank}.";
             TempData["Confidence"] = $"{result.Confidence:P1}";
 
-            // Map to editable ViewModel
+            // Build editable ViewModel — merge PDF data + customer flow data
             var editVm = new StatementEditViewModel
             {
+                // From PDF parser
                 BankName = result.Statement!.BankName,
-                AccountNumber = result.Statement!.AccountNumber,
-                AccountHolderName = result.Statement!.AccountHolderName,
-                AccountType = result.Statement!.AccountType,
-                Currency = result.Statement!.Currency,
-                Transactions = result.Statement!.Transactions.Select((tx, idx) => new EditableTransaction
+                AccountNumber = result.Statement.AccountNumber,
+                AccountHolderName = result.Statement.AccountHolderName,
+                AccountType = result.Statement.AccountType,
+                Currency = result.Statement.Currency,
+
+                // From customer flow (overrides PDF data where available)
+                CustomerName = TempData["CustomerName"] as string ?? result.Statement.AccountHolderName,
+                CustomerAccountNo = TempData["CustomerAccountNo"] as string ?? result.Statement.AccountNumber,
+                CustomerAccountType = TempData["CustomerAccountType"] as string ?? result.Statement.AccountType,
+                CustomerCurrency = TempData["CustomerCurrency"] as string ?? result.Statement.Currency,
+                CustomerBranch = TempData["CustomerBranch"] as string ?? "",
+                CustomerCIF = TempData["CustomerCIF"] as string ?? "",
+
+                Transactions = result.Statement.Transactions.Select((tx, idx) => new EditableTransaction
                 {
                     RowIndex = idx,
                     Date = tx.Date.ToString("dd/MM/yyyy"),
@@ -127,25 +116,16 @@ public class StatementController : Controller
                     Balance = tx.Balance
                 }).ToList()
             };
+            editVm.ComputeHeaderFromTransactions();
+
             return View("Preview", editVm);
-        }
-        catch (UnsupportedStatementException ex)
-        {
-            // Auto-detect failed — prompt user to select bank manually
-            ModelState.AddModelError("", ex.Message);
-            model.AvailableBanks = _parserRegistry.AllParsers
-                .Select(p => new BankOptionViewModel
-                {
-                    BankKey = p.BankKey,
-                    DisplayName = p.DisplayName
-                }).ToList();
-            return View(model);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing statement: {FileName}", model.File.FileName);
             TempData["Error"] = $"An unexpected error occurred: {ex.Message}";
-            return RedirectToAction(nameof(Upload));
+            model.AvailableBanks = GetAvailableBankOptions();
+            return View(model);
         }
     }
 
@@ -161,15 +141,22 @@ public class StatementController : Controller
             return View("Preview", model);
         }
 
-        // Here you would save to database, trigger export, etc.
-        // For now, we just confirm receipt
         TempData["Success"] = $"{model.Transactions.Count} transactions submitted successfully.";
-        
+
         _logger.LogInformation(
             "Statement submitted: {Bank} A/C {Account}, {Count} transactions, Total Dr: {Dr:N2}, Total Cr: {Cr:N2}",
             model.BankName, model.AccountNumber, model.Transactions.Count,
             model.TotalDebit, model.TotalCredit);
 
         return RedirectToAction(nameof(Upload));
+    }
+
+    private static List<BankOptionViewModel> GetAvailableBankOptions()
+    {
+        return
+        [
+            new BankOptionViewModel { BankKey = "ibbl", DisplayName = "Islami Bank Bangladesh PLC" },
+            new BankOptionViewModel { BankKey = "dbbl", DisplayName = "Dutch-Bangla Bank PLC" }
+        ];
     }
 }
